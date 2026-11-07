@@ -219,5 +219,9 @@ Template for each problem (copy for each new problem):
 **Follow-up prompt:**
 
 > chapel-street-ops-desk (repo name)
+>
+> where on public url can i see the pretty user front
+>
+> yes please (turn on GitHub Pages)
 
-**What was lacking before:** hw5 didn't match the required layout (the MCP server was mcp_server.py, there was one venv and requirements file per folder, no top-level README, .env.example or .mcp.json, and the screenshots sat in a separate folder). So I restructured it to one root environment and server.py, embedded the screenshots in resolved_board.html, and checked that no secret was in the files before pushing to a new public repo.
+**What was lacking before:** hw5 didn't match the required layout (the MCP server was mcp_server.py, there was one venv and requirements file per folder, no top-level README, .env.example or .mcp.json, and the screenshots sat in a separate folder). So I restructured it to one root environment and server.py, embedded the screenshots in resolved_board.html, and checked that no secret was in the files before pushing to a new public repo. GitHub only showed the HTML pages as source code, so GitHub Pages now serves a landing page, the board gallery and the plan-vs-actual desk at https://sophiaruilin.github.io/chapel-street-ops-desk/.
