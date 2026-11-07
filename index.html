@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapel Street Ops Desk · Campus Customs (HW 5)</title>
+<style>
+  :root { --navy:#00356b; --navy-d:#00244a; --cream:#f4eedf; --ivory:#fffdf7; --brass:#b08d57; --brass-l:#dcc8a0; --ink:#1d2433; --muted:#5d6675; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--cream); color:var(--ink); font:16px/1.55 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  header { background:var(--navy); color:var(--ivory); padding:44px 24px 38px; text-align:center; border-bottom:4px solid var(--brass); }
+  .mark { display:inline-grid; place-items:center; width:58px; height:58px; border-radius:50%; background:var(--ivory); color:var(--navy);
+          font:800 20px Georgia, serif; box-shadow:0 0 0 3px var(--brass), 0 0 0 6px var(--navy), 0 0 0 7px var(--brass-l); margin-bottom:14px; }
+  h1 { margin:0; font:800 clamp(28px,4vw,40px) Georgia, "Playfair Display", serif; }
+  header p { margin:8px auto 0; max-width:640px; color:var(--brass-l); }
+  main { max-width:940px; margin:0 auto; padding:34px 22px 50px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px; }
+  a.card { display:block; text-decoration:none; color:inherit; background:var(--ivory); border-radius:14px; padding:20px 22px;
+           box-shadow:0 0 0 1px var(--brass-l), 0 0 0 5px var(--ivory), 0 0 0 6px var(--brass-l), 0 6px 18px rgb(0 0 0 / .08); transition:transform .15s; }
+  a.card:hover { transform:translateY(-3px); }
+  .kicker { font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--brass); font-weight:700; }
+  a.card h2 { margin:6px 0 6px; font:800 22px Georgia, serif; color:var(--navy); }
+  a.card p { margin:0; color:var(--muted); font-size:15px; }
+  .go { display:inline-block; margin-top:12px; font-weight:700; color:var(--navy); }
+  .note { margin-top:26px; background:#fff8e8; border:1px solid #f0d9a8; border-radius:12px; padding:14px 18px; font-size:15px; }
+  code { background:rgb(0 53 107 / .07); padding:0 5px; border-radius:4px; font-size:14px; }
+  footer { text-align:center; color:var(--muted); font-size:13px; padding-bottom:30px; }
+  footer a { color:var(--navy); }
+</style>
+</head>
+<body>
+<header>
+  <div class="mark">CC</div>
+  <h1>Chapel Street Ops Desk</h1>
+  <p>Campus Customs · HW 5. Five AI agents work the shop's ticket board through an MCP server, and a person signs every payment.</p>
+</header>
+<main>
+  <div class="cards">
+    <a class="card" href="hw5/output/resolved_board.html">
+      <span class="kicker">The dashboard</span>
+      <h2>See the React desk</h2>
+      <p>Screenshots of the live board after each ticket (101 tee, 102 rent, 103 hoodies): the team table, the signature tray with its cheques, the brass cash ledger and Handsome Dan.</p>
+      <span class="go">Open the board gallery →</span>
+    </a>
+    <a class="card" href="hw5/output/desk_tickets.html">
+      <span class="kicker">The write-up</span>
+      <h2>Plan vs actual</h2>
+      <p>One tab per ticket comparing the expected plan with what the agents really did, plus the itemized Cash tab and the Reflection.</p>
+      <span class="go">Open the ticket desk →</span>
+    </a>
+  </div>
+  <div class="note">
+    <b>Want the live, clickable board?</b> It needs the agents and backend running, so clone the repo and follow
+    <a href="https://github.com/sophiaruilin/chapel-street-ops-desk/blob/main/hw5/README.md"><code>hw5/README.md</code></a>.
+    In short: <code>pip install -r requirements.txt</code>, then <code>uvicorn main:app --port 8000</code> in <code>backend/</code> and <code>npm run dev</code> in <code>frontend/</code>, then open <code>http://localhost:5173</code>.
+  </div>
+</main>
+<footer>Code: <a href="https://github.com/sophiaruilin/chapel-street-ops-desk">github.com/sophiaruilin/chapel-street-ops-desk</a> · harness: <a href="https://github.com/sophiaruilin/chapel-street-ops-desk/blob/main/hw5/output/harness.md">hw5/output/harness.md</a></footer>
+</body>
+</html>
