@@ -1,0 +1,342 @@
+{
+  "run": "HW 5 Problem 9 full run on the React board (tickets 101 -> 102 -> 103)",
+  "database": "data/campus_customs_new.db (reset to original before the run)",
+  "shop_date": "2026-08-31",
+  "cash": {
+    "starting_checking": 3400.0,
+    "payments_made": 0,
+    "payments_total": 0.0,
+    "ending_checking": 3400.0,
+    "ending_matches_cash_accounts": true,
+    "note": "No money moved: both prepared payments were intentionally left pending. If signed: 3400 - 840 - 2400 = 160."
+  },
+  "resolution_note": "No ticket is marked resolved. Tickets 101 and 102 are waiting on unsigned cheques, and 103 is blocked on a human pricing decision and funded restock. Resolving them needs a human action this run deliberately did not take.",
+  "tickets": [
+    {
+      "id": 101,
+      "final_status": "waiting_approval",
+      "team_run_id": "a02b5d3e49",
+      "outcome": "Size S Classic Bulldog Tee is out of stock (0 in Aisle B). The reprint vendor, Bulldog Print Co (5-day lead), won't ship until overdue invoice 501 ($840) is paid. Accounting queued the $840 payment for human approval; the customer reply and internal note were saved as drafts. Not resolved: the cheque was left unsigned.",
+      "run_stats": {
+        "handoffs": 7,
+        "handoffs_refused_by_guards": 5,
+        "model_requests": 27,
+        "total_tokens": 74440
+      },
+      "agents": {
+        "boss": {
+          "called": true,
+          "times_called": 1,
+          "called_by": [],
+          "delegated_to": [
+            "accounting",
+            "customer_service",
+            "inventory"
+          ],
+          "mcp_tools": {
+            "get_desk_date": 1,
+            "list_open_tickets": 1,
+            "update_ticket_status": 1
+          },
+          "contribution": "Read the board and desk date, asked Inventory first, then Accounting and Customer Service, and set the ticket to waiting_approval with a final report."
+        },
+        "inventory": {
+          "called": true,
+          "times_called": 3,
+          "called_by": [
+            "accounting",
+            "boss",
+            "customer_service"
+          ],
+          "delegated_to": [],
+          "mcp_tools": {
+            "get_desk_date": 3,
+            "check_stock_by_sku_and_size": 3,
+            "list_vendors": 3,
+            "list_open_invoices": 3
+          },
+          "contribution": "Confirmed 0 in stock (Aisle B), found Bulldog Print Co (apparel reprint, 5 lead days) and invoice 501 open and 3 days overdue, so the vendor won't ship."
+        },
+        "accounting": {
+          "called": true,
+          "times_called": 3,
+          "called_by": [
+            "boss",
+            "customer_service"
+          ],
+          "delegated_to": [
+            "inventory"
+          ],
+          "mcp_tools": {
+            "get_desk_date": 3,
+            "get_cash_balances": 3,
+            "list_open_invoices": 3,
+            "get_sku_cost_and_price": 1,
+            "list_payments": 3,
+            "pay_invoice": 1
+          },
+          "contribution": "Checked cash ($3,400) and payment history (501 unpaid), then prepared pay_invoice(501, checking) for $840, which paused for human approval (5ef259bd)."
+        },
+        "facilities": {
+          "called": false,
+          "times_called": 0,
+          "called_by": [],
+          "delegated_to": [],
+          "mcp_tools": {},
+          "contribution": "Not called (no lease involved), as planned."
+        },
+        "customer_service": {
+          "called": true,
+          "times_called": 1,
+          "called_by": [
+            "boss"
+          ],
+          "delegated_to": [
+            "accounting",
+            "inventory"
+          ],
+          "mcp_tools": {
+            "list_open_tickets": 1,
+            "get_desk_date": 1,
+            "get_ticket": 1,
+            "check_stock_by_sku_and_size": 1,
+            "add_ticket_draft": 2
+          },
+          "contribution": "Saved a draft to Tauhid (size S out, restock waits on vendor payment, 5-day lead, no promised date) and an internal note. Nothing sent."
+        }
+      },
+      "human_approvals": [
+        {
+          "approval_id": "5ef259bd",
+          "tool": "pay_invoice",
+          "args": {
+            "invoice_id": 501,
+            "account": "checking"
+          },
+          "payee": "Bulldog Print Co",
+          "amount": 840.0,
+          "prepared_by": "accounting",
+          "status": "pending",
+          "human_decision": "Left unsigned on purpose: the user said \"don't send any money but just let it sit.\" Not approved, not declined."
+        }
+      ],
+      "cash_change": 0.0
+    },
+    {
+      "id": 102,
+      "final_status": "waiting_approval",
+      "team_run_id": "ada701f573",
+      "outcome": "The rent notice was checked against lease 1: Elm City Properties, $2,400 due 2026-09-02 (2 days from the desk date), with no rent paid yet. The email itself stated no amount. Accounting queued the lease-backed $2,400 rent payment for human approval; landlord and internal drafts were saved. Not resolved: the cheque was left unsigned.",
+      "run_stats": {
+        "handoffs": 9,
+        "handoffs_refused_by_guards": 3,
+        "model_requests": 31,
+        "total_tokens": 88170
+      },
+      "agents": {
+        "boss": {
+          "called": true,
+          "times_called": 1,
+          "called_by": [],
+          "delegated_to": [
+            "accounting",
+            "customer_service",
+            "facilities"
+          ],
+          "mcp_tools": {
+            "list_open_tickets": 1,
+            "get_desk_date": 1,
+            "update_ticket_status": 1
+          },
+          "contribution": "Sent Facilities first to verify the notice, then Accounting and Customer Service, and set the ticket to waiting_approval."
+        },
+        "inventory": {
+          "called": false,
+          "times_called": 0,
+          "called_by": [],
+          "delegated_to": [],
+          "mcp_tools": {},
+          "contribution": "Not called (no product involved), as planned."
+        },
+        "accounting": {
+          "called": true,
+          "times_called": 3,
+          "called_by": [
+            "boss",
+            "customer_service"
+          ],
+          "delegated_to": [
+            "customer_service",
+            "facilities"
+          ],
+          "mcp_tools": {
+            "get_desk_date": 3,
+            "get_cash_balances": 3,
+            "list_payments": 3,
+            "list_open_invoices": 3,
+            "pay_rent": 1
+          },
+          "contribution": "Checked $3,400 cash, open invoice 501 and rent history, did the budget math ($160 left if both bills are paid), and prepared pay_rent(1, checking) for $2,400, which paused for human approval (60ca7e64)."
+        },
+        "facilities": {
+          "called": true,
+          "times_called": 4,
+          "called_by": [
+            "accounting",
+            "boss",
+            "customer_service"
+          ],
+          "delegated_to": [],
+          "mcp_tools": {
+            "get_desk_date": 4,
+            "get_ticket": 4,
+            "get_lease_rent_and_cash": 4,
+            "list_payments": 4
+          },
+          "contribution": "Verified sender, amount and due date against lease 1 (all match) and that no rent payment is recorded, and flagged that the notice omitted the amount. Called 4 times."
+        },
+        "customer_service": {
+          "called": true,
+          "times_called": 2,
+          "called_by": [
+            "accounting",
+            "boss"
+          ],
+          "delegated_to": [
+            "accounting",
+            "facilities"
+          ],
+          "mcp_tools": {
+            "list_open_tickets": 2,
+            "get_desk_date": 2,
+            "add_ticket_draft": 2
+          },
+          "contribution": "Saved a landlord acknowledgment draft (amount and date from the lease, no payment promised) and an internal note. Nothing sent."
+        }
+      },
+      "human_approvals": [
+        {
+          "approval_id": "60ca7e64",
+          "tool": "pay_rent",
+          "args": {
+            "lease_id": 1,
+            "account": "checking"
+          },
+          "payee": "Elm City Properties",
+          "amount": 2400.0,
+          "prepared_by": "accounting",
+          "status": "pending",
+          "human_decision": "Left unsigned on purpose: the user said \"don't send any money but just let it sit.\" Not approved, not declined."
+        }
+      ],
+      "cash_change": 0.0
+    },
+    {
+      "id": 103,
+      "final_status": "blocked",
+      "team_run_id": "c7e2bbaa10",
+      "outcome": "Only 8 of the 20 requested CC-HOOD-NAVY size M are on hand (short 12). Unit cost is $22 and list price $58 (62.1% margin), so no discount was approved without a human. The reprint is blocked by the same unpaid invoice 501, and 12 × $22 = $264 would not fit in the $160 left if both bills are paid. A draft to the club asks about budget and a partial fill. Status blocked; no money moved.",
+      "run_stats": {
+        "handoffs": 9,
+        "handoffs_refused_by_guards": 9,
+        "model_requests": 37,
+        "total_tokens": 109996
+      },
+      "agents": {
+        "boss": {
+          "called": true,
+          "times_called": 1,
+          "called_by": [],
+          "delegated_to": [
+            "accounting",
+            "customer_service",
+            "inventory"
+          ],
+          "mcp_tools": {
+            "list_open_tickets": 1,
+            "get_desk_date": 1,
+            "update_ticket_status": 1
+          },
+          "contribution": "Asked Inventory, then Accounting, then Customer Service, and set the ticket to blocked (pricing decision and funded replenishment needed)."
+        },
+        "inventory": {
+          "called": true,
+          "times_called": 3,
+          "called_by": [
+            "accounting",
+            "boss",
+            "customer_service"
+          ],
+          "delegated_to": [],
+          "mcp_tools": {
+            "get_desk_date": 3,
+            "check_stock_by_sku_and_size": 3,
+            "list_vendors": 3,
+            "list_open_invoices": 3
+          },
+          "contribution": "Confirmed 8 in Aisle A vs 20 requested (short 12); vendor lead 5 days; shipping blocked by open invoice 501."
+        },
+        "accounting": {
+          "called": true,
+          "times_called": 2,
+          "called_by": [
+            "boss",
+            "customer_service"
+          ],
+          "delegated_to": [
+            "customer_service",
+            "facilities",
+            "inventory"
+          ],
+          "mcp_tools": {
+            "get_desk_date": 2,
+            "get_sku_cost_and_price": 2,
+            "get_cash_balances": 2,
+            "list_open_invoices": 2,
+            "list_payments": 2
+          },
+          "contribution": "Gave $22 cost, $58 list price, $36/62.1% margin ($1,160 for 20 at list), plus the cash context; recommended no discount without a human decision."
+        },
+        "facilities": {
+          "called": true,
+          "times_called": 2,
+          "called_by": [
+            "accounting",
+            "customer_service"
+          ],
+          "delegated_to": [],
+          "mcp_tools": {
+            "get_desk_date": 2,
+            "get_ticket": 2,
+            "list_payments": 1,
+            "get_lease_rent_and_cash": 2
+          },
+          "contribution": "Pulled in by Accounting and Customer Service to confirm the $2,400 rent obligation for the cash picture. Not in the plan."
+        },
+        "customer_service": {
+          "called": true,
+          "times_called": 2,
+          "called_by": [
+            "accounting",
+            "boss"
+          ],
+          "delegated_to": [
+            "accounting",
+            "facilities",
+            "inventory"
+          ],
+          "mcp_tools": {
+            "list_open_tickets": 2,
+            "get_desk_date": 2,
+            "get_ticket": 1,
+            "check_stock_by_sku_and_size": 2,
+            "add_ticket_draft": 2
+          },
+          "contribution": "Saved a draft to Yale AI Club (8 on hand / 12 short, list price for reference only, no discount approved, asks for budget and whether a partial fill helps) and an internal note. Nothing sent."
+        }
+      },
+      "human_approvals": [],
+      "cash_change": 0.0
+    }
+  ]
+}

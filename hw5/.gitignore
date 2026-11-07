@@ -1,0 +1,32 @@
+# Secrets: keep the template, never the real key
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Node / Vite
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Runtime scratch written while the app runs (recreated automatically)
+output/pending_approvals.json
+output/last_run_report.md
+output/audit_trail.tmp
+output/audit_trail.pending.jsonl
+output/audit_trail.corrupt.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# NOTE: data/campus_customs.db and data/campus_customs_new.db are committed on purpose
+# so graders can run the app right after cloning.

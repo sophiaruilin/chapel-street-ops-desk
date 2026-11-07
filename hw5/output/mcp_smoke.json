@@ -1,0 +1,89 @@
+{
+  "description": "Smoke test of the campus-customs-ops MCP server, called from Claude Code (vibe coder) over its stdio MCP connection. Each output was cross-checked against data/campus_customs_new.db with direct SQL.",
+  "server": "campus-customs-ops",
+  "server_file": "mcp_server/server.py",
+  "database": "data/campus_customs_new.db",
+  "connection_config": ".mcp.json (project root); also registered in ~/.claude.json so the Claude desktop app loads it",
+  "tested_on": "2026-11-06",
+  "tests": [
+    {
+      "ticket": 101,
+      "prompt": "Ticket 101: Tauhid Zaman wants one Classic Bulldog Tee (CC-TEE-WHITE) in size S. Is it on the shelf, and where?",
+      "tool": "check_stock_by_sku_and_size",
+      "arguments": { "sku": "CC-TEE-WHITE", "size": "S" },
+      "output": {
+        "found": true,
+        "sku": "CC-TEE-WHITE",
+        "name": "Classic Bulldog Tee",
+        "size": "S",
+        "qty": 0,
+        "location": "Aisle B",
+        "in_stock": false
+      },
+      "db_check": {
+        "sql": "SELECT sku, name, size, qty, location FROM inventory WHERE sku='CC-TEE-WHITE' AND size='S'",
+        "db_row": ["CC-TEE-WHITE", "Classic Bulldog Tee", "S", 0, "Aisle B"],
+        "matches": true
+      }
+    },
+    {
+      "ticket": 102,
+      "prompt": "Ticket 102: an email from Elm City Properties says shop rent is due in 2 days. What does lease 1 actually say, how much cash do we have, and how many days until rent is due from the desk date?",
+      "tool": "get_lease_rent_and_cash",
+      "arguments": { "lease_id": 1 },
+      "output": {
+        "found": true,
+        "lease": {
+          "id": 1,
+          "space_name": "Chapel Street shop",
+          "landlord": "Elm City Properties",
+          "monthly_rent": 2400,
+          "next_due": "2026-09-02",
+          "notes": null
+        },
+        "cash_accounts": [
+          { "name": "checking", "balance": 3400, "date": "2026-08-31" }
+        ],
+        "date_today": "2026-08-31",
+        "days_until_due": 2,
+        "overdue": false
+      },
+      "db_check": {
+        "sql": [
+          "SELECT id, space_name, landlord, monthly_rent, next_due, notes FROM leases WHERE id=1",
+          "SELECT name, balance, date FROM cash_accounts",
+          "SELECT date_today FROM desk"
+        ],
+        "db_rows": [
+          [1, "Chapel Street shop", "Elm City Properties", 2400.0, "2026-09-02", null],
+          ["checking", 3400.0, "2026-08-31"],
+          ["2026-08-31"]
+        ],
+        "derived": "days_until_due = 2026-09-02 minus desk date 2026-08-31 = 2, which matches the email's 'due in 2 days'",
+        "matches": true
+      }
+    },
+    {
+      "ticket": 103,
+      "prompt": "Ticket 103: Yale AI Club wants 20 Basic Hoodie Big Yale (CC-HOOD-NAVY) at a bulk discount. What does each hoodie cost us, what is the list price, and what margin do we have to work with?",
+      "tool": "get_sku_cost_and_price",
+      "arguments": { "sku": "CC-HOOD-NAVY" },
+      "output": {
+        "found": true,
+        "sku": "CC-HOOD-NAVY",
+        "name": "Basic Hoodie Big Yale",
+        "unit_cost": 22,
+        "list_price": 58,
+        "margin_per_unit": 36,
+        "margin_pct_of_list": 62.1
+      },
+      "db_check": {
+        "sql": "SELECT sku, unit_cost, list_price FROM pricing WHERE sku='CC-HOOD-NAVY'",
+        "db_row": ["CC-HOOD-NAVY", 22.0, 58.0],
+        "derived": "margin_per_unit = 58 - 22 = 36; margin_pct_of_list = 36 / 58 = 62.1%",
+        "matches": true
+      }
+    }
+  ],
+  "summary": "3 of 3 tools returned values identical to data/campus_customs_new.db. All tools are read-only, and the working copy is still byte-identical to the original after the tests."
+}

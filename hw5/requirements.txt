@@ -1,0 +1,9 @@
+# One environment for everything in hw5 (MCP server + agents + FastAPI backend).
+#   python -m venv .venv
+#   .venv\Scripts\activate      (Windows)   |   source .venv/bin/activate   (macOS/Linux)
+#   pip install -r requirements.txt
+fastmcp>=2.10                     # MCP server (mcp_server/server.py)
+pydantic-ai-slim[openai,mcp]>=1.0 # the five agents + MCP client
+python-dotenv>=1.0                # reads PORTKEY_API_KEY from .env
+fastapi>=0.115                    # backend/main.py
+uvicorn[standard]>=0.30           # serves the backend
