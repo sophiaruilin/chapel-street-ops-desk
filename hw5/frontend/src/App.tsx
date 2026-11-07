@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, API_URL } from './api'
 import { STATUS_LABEL, TICKET_KIND, money } from './agents'
 import { deriveActivity } from './derive'
-import type { Approval, Cash, DeskEvent, Run, Ticket } from './types'
+import type { Approval, Cash, DeskEvent, Run, Ticket, TicketDetail } from './types'
 import TicketRail from './components/TicketRail'
 import TeamTable from './components/TeamTable'
 import Wire from './components/Wire'
@@ -14,6 +14,7 @@ import DanCorner from './components/DanCorner'
 const RUNS_KEY = 'cc-desk-runs'
 const SIGNER_KEY = 'cc-desk-signer'
 const OPENING_KEY = 'cc-desk-opening'
+const PIN_KEY = 'cc-desk-pin' // sessionStorage only: forgotten when the tab closes
 
 type Tab = 'wire' | 'summary'
 
@@ -25,11 +26,14 @@ export default function App() {
     return v ? Number(v) : null
   })
   const [approvals, setApprovals] = useState<Approval[]>([])
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const params = new URLSearchParams(window.location.search)
+  const [selectedId, setSelectedId] = useState<number | null>(() => Number(params.get('ticket')) || null)
   const [runs, setRuns] = useState<Record<number, Run>>(() => JSON.parse(localStorage.getItem(RUNS_KEY) ?? '{}'))
   const [events, setEvents] = useState<Record<string, DeskEvent[]>>({})
-  const [tab, setTab] = useState<Tab>('wire')
+  const [tab, setTab] = useState<Tab>(() => (params.get('tab') === 'summary' ? 'summary' : 'wire'))
   const [signer, setSigner] = useState(() => localStorage.getItem(SIGNER_KEY) ?? '')
+  const [pin, setPin] = useState(() => sessionStorage.getItem(PIN_KEY) ?? '')
+  const [detail, setDetail] = useState<TicketDetail | null>(null)
   const [offline, setOffline] = useState<string | null>(null)
   const [cheer, setCheer] = useState<{ text: string; key: number } | null>(null)
   const lastIndex = useRef<Record<string, number>>({})
@@ -68,10 +72,22 @@ export default function App() {
 
   useEffect(() => localStorage.setItem(RUNS_KEY, JSON.stringify(runs)), [runs])
   useEffect(() => localStorage.setItem(SIGNER_KEY, signer), [signer])
+  useEffect(() => sessionStorage.setItem(PIN_KEY, pin), [pin])
 
   const busyRun = useMemo(() => Object.values(runs).find((r) => r.status === 'running') ?? null, [runs])
   const selectedRun = selectedId != null ? runs[selectedId] ?? null : null
   const selectedTicket = tickets.find((t) => t.id === selectedId) ?? null
+
+  useEffect(() => {
+    if (selectedId == null) return
+    api.ticket(selectedId).then(setDetail).catch(() => setDetail(null))
+  }, [selectedId, tickets])
+
+  // A ticket's last run comes back from the audit trail (survives restarts and fresh browsers).
+  useEffect(() => {
+    if (selectedId == null || runs[selectedId]) return
+    api.lastRunFor(selectedId).then((r) => r && setRuns((rs) => ({ ...rs, [r.ticket_id]: r }))).catch(() => {})
+  }, [selectedId, runs])
 
   // ---------------------------------------------------------------- events for the selected run
   const pullEvents = useCallback(async (runId: string) => {
@@ -127,15 +143,17 @@ export default function App() {
   }
 
   const approve = async (a: Approval) => {
-    const res = await api.approve(a.id, signer.trim())
+    const res = await api.approve(a.id, signer.trim(), pin.trim())
     await refreshBoard()
     if (selectedRun) await pullEvents(selectedRun.team_run_id).catch(() => {})
-    if (res.paid) say(`Signed and cleared: ${money(Number(res.approval.result?.amount ?? 0))}. Beautiful penmanship!`)
-    else throw new Error(`The bank refused it: ${res.approval.reason}`)
+    if (res.done && res.paid) say(`Signed and cleared: ${money(Number(res.result.amount ?? 0))}. Beautiful penmanship!`)
+    else if (res.done) say('Approved. The price is on record (no cash moves for a price).')
+    else if (res.result.needs_second_approver) say('First signature in! This one needs a second, different person.')
+    else throw new Error(`The pay tool refused it (practice ledger): ${String(res.result.message ?? 'refused')}`)
   }
 
   const decline = async (a: Approval, reason: string) => {
-    await api.decline(a.id, reason)
+    await api.decline(a.id, signer.trim(), pin.trim(), reason)
     await refreshBoard()
     say('Declined, nothing paid. Saying no is part of the job, too.')
   }
@@ -147,9 +165,11 @@ export default function App() {
   }
 
   const reset = async () => {
-    if (!confirm('Reset the shop to its original August 31 values? Payments, drafts and statuses from earlier runs are wiped from the working database (the audit trail keeps its history).')) return
+    if (!confirm('Reset the shop to its original August 31 values? Payments, approvals, drafts and statuses from earlier runs are wiped from the working database (the audit trail keeps its history).')) return
+    const usePin = pin.trim() || (prompt('Desk PIN (DESK_APPROVAL_PIN in .env):') ?? '').trim()
+    if (!usePin) return
     try {
-      await api.reset()
+      await api.reset(usePin)
       setRuns({})
       setEvents({})
       lastIndex.current = {}
@@ -166,8 +186,8 @@ export default function App() {
   // ---------------------------------------------------------------- derived view
   const runEvents = selectedRun ? events[selectedRun.team_run_id] ?? [] : []
   const activity = useMemo(() => deriveActivity(runEvents), [runEvents])
-  const pending = approvals.filter((a) => a.status === 'pending')
-  const paid = approvals.filter((a) => a.status === 'approved')
+  const pending = approvals.filter((a) => a.status === 'pending' || a.status === 'partially_approved')
+  const paid = approvals.filter((a) => a.status === 'approved' && a.kind !== 'price')
   const running = selectedRun?.status === 'running'
   const pendingForSelected = pending.filter((a) => a.ticket_id === selectedId).length
 
@@ -179,7 +199,7 @@ export default function App() {
           <span>Campus Customs<small>Chapel Street Ops Desk</small></span>
         </div>
         <DeskCalendar iso={cash?.date_today} />
-        <Ledger cash={cash} opening={opening} paid={paid} />
+        <Ledger cash={cash} opening={cash?.opening_balance ?? opening} paid={paid} />
         <button className="btn btn-reset" onClick={reset} disabled={!!busyRun} title="Restore the original August 31 database">
           ↺ Reset the shop
         </button>
@@ -215,11 +235,11 @@ export default function App() {
             </button>
           </div>
           <div className="tab-body">
-            {tab === 'wire' ? <Wire events={runEvents} running={running} /> : <Summary activity={activity} run={selectedRun} />}
+            {tab === 'wire' ? <Wire events={runEvents} running={running} /> : <Summary activity={activity} run={selectedRun} drafts={detail?.drafts ?? []} />}
           </div>
         </section>
 
-        <ApprovalTray pending={pending} signer={signer} onSigner={setSigner} onApprove={approve} onDecline={decline} />
+        <ApprovalTray pending={pending} signer={signer} onSigner={setSigner} pin={pin} onPin={setPin} onApprove={approve} onDecline={decline} />
       </main>
 
       <DanCorner cheer={cheer} />

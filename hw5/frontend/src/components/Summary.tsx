@@ -2,11 +2,11 @@ import Markdown from 'react-markdown'
 import { AGENTS, ROLES, TOOL_LABELS } from '../agents'
 import { clip, plain } from '../derive'
 import type { AgentActivity } from '../derive'
-import type { Role, Run } from '../types'
+import type { Draft, Role, Run } from '../types'
 
 // After a run: one receipt per agent (who called it, what it did, which tools, its last word),
 // then the Boss's full memo. Agents that weren't needed say so, which is the point.
-export default function Summary({ activity, run }: { activity: Record<Role, AgentActivity>; run: Run | null }) {
+export default function Summary({ activity, run, drafts }: { activity: Record<Role, AgentActivity>; run: Run | null; drafts: Draft[] }) {
   if (!run) return <div className="wire-empty"><p className="hand">No run yet for this ticket.</p></div>
   return (
     <div className="summary">
@@ -24,6 +24,17 @@ export default function Summary({ activity, run }: { activity: Record<Role, Agen
           </header>
           <Markdown>{run.report}</Markdown>
         </article>
+      )}
+      {drafts.length > 0 && (
+        <section className="drafts" aria-label="Drafts on this ticket">
+          <h3>Drafts on the board <small>never sent</small></h3>
+          {drafts.map((d) => (
+            <article key={d.id} className={`draft draft-${d.audience}`}>
+              <span className="draft-tag">{d.audience === 'customer' ? 'To the requester' : 'Internal note: team only'}</span>
+              <p>{d.text}</p>
+            </article>
+          ))}
+        </section>
       )}
       {run.error && <p className="error-note">The run failed: {run.error}</p>}
     </div>

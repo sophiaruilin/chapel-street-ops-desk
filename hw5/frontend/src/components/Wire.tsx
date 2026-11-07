@@ -97,15 +97,18 @@ function WireItem({ e }: { e: DeskEvent }) {
       </li>
     )
   }
-  if (e.event === 'approval_queued' || e.event === 'paused_for_approval') {
-    if (e.event === 'paused_for_approval') return null
+  if (e.event === 'approval_prepared') {
     return (
       <li className="wire-item sign" style={indent}>
-        ✒ {e.agent && <Who role={e.agent} />} prepared a payment and put it in your signature tray. No money has moved.
+        ✒ {e.agent && <Who role={e.agent} />} prepared <b>{e.said?.replace(/^Prepared for a human: /, '')}</b>. It is in your signature tray, and nothing has moved yet.
       </li>
     )
   }
-  if (e.event.startsWith('payment_') || e.event === 'ticket_status') {
+  if (e.event === 'approval_refused') {
+    return <li className="wire-item muted" style={indent}>{e.agent && <Who role={e.agent} />} could not prepare it: {e.said}</li>
+  }
+  if (e.event === 'paused_for_approval' || e.event === 'approval_queued') return null
+  if (e.event.startsWith('payment_') || e.event === 'approval_signed' || e.event === 'approval_partly_signed' || e.event === 'ticket_status') {
     return <li className={`wire-item human ${e.event}`}>☞ <b>You</b> · {e.said}</li>
   }
   if (e.event === 'error') return <li className="wire-item error">Something went wrong: {e.said}</li>

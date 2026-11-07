@@ -367,3 +367,24 @@ button { font: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ------------------------------------------------------------------ v2: signer, price cards, drafts */
+.signer-card { background: rgb(255 253 247 / 0.8); border: 1px solid var(--brass-light); border-radius: 10px; padding: 0.6rem 0.8rem; margin-bottom: 0.9rem; display: grid; grid-template-columns: 1fr 96px; gap: 0.5rem 0.7rem; }
+.signer-card label { display: block; }
+.signer-name, .signer-pin { width: 100%; border: 0; border-bottom: 1.5px solid var(--navy); background: transparent; outline: none; padding: 0 0.2rem; }
+.signer-name { font-family: var(--hand); font-size: 1.45rem; color: var(--navy); line-height: 1.2; }
+.signer-pin { font-family: var(--mono); font-size: 1rem; letter-spacing: 0.25em; padding-top: 0.35rem; }
+.practice-note { grid-column: 1 / -1; margin: 0; font-size: 0.72rem; color: var(--muted); }
+.practice { margin-left: 0.4rem; font-family: var(--sans); font-size: 0.62rem; letter-spacing: 0.04em; color: var(--muted); text-transform: uppercase; }
+.cheque-price { background: repeating-linear-gradient(135deg, rgb(46 107 79 / 0.05) 0 2px, transparent 2px 7px), linear-gradient(180deg, #f3faf5, #e5f2ea); box-shadow: 0 0 0 1px #b6d8c3, 0 6px 18px rgb(46 107 79 / 0.14); }
+.cheque-price .cheque-amount { color: var(--green); border-color: #a8d0b8; }
+.two-sig { margin: 0.5rem 0 0; font-size: 0.78rem; color: var(--brass-dark); font-weight: 600; }
+.drafts h3 { font-size: 1.1rem; margin-bottom: 0.4rem; }
+.drafts h3 small { font-family: var(--sans); font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-left: 0.4rem; }
+.draft { border-radius: 6px; padding: 0.6rem 0.9rem; margin-bottom: 0.6rem; }
+.draft p { margin: 0.2rem 0 0; white-space: pre-wrap; }
+.draft-tag { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.draft-customer { background: repeating-linear-gradient(#f7fbff 0 1.55em, #d5e4f5 1.55em calc(1.55em + 1px)); font-family: var(--hand); font-size: 1.15rem; line-height: 1.55em; box-shadow: 2px 3px 0 rgb(40 109 192 / 0.15); }
+.draft-customer .draft-tag { font-family: var(--sans); color: var(--navy-light); }
+.draft-internal { background: #f3f1ec; border: 1px dashed #c9c2b2; font-size: 0.85rem; color: var(--muted); }
+.draft-internal .draft-tag { color: var(--red); }

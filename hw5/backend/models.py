@@ -13,33 +13,45 @@ from pydantic_ai.usage import RunUsage
 Role = Literal["boss", "inventory", "accounting", "facilities", "customer_service"]
 ROLES: tuple[Role, ...] = ("boss", "inventory", "accounting", "facilities", "customer_service")
 
-# Tools that move money. They pause the run until a human approves in the terminal.
-PAY_TOOLS = frozenset({"pay_invoice", "pay_rent"})
+# Tools that move money or set a price. Calling one pauses the run; the harness prepares an
+# approval in the database (amount frozen) and only a human decision lets it execute.
+APPROVAL_TOOLS = frozenset({"pay_invoice", "pay_rent", "order_stock", "set_bulk_price"})
 
 
 class ApprovalRequest(BaseModel):
-    """What the human sees before a payment runs."""
+    """What the human sees before anything is paid, ordered or priced (amount frozen in the DB)."""
 
     agent: Role
     tool: str
     args: dict[str, Any]
     tool_call_id: str
+    approval_id: str
+    kind: str                   # payment | purchase | price
+    payee: str | None = None
+    amount: float
+    memo: str | None = None
+    needs_two_approvers: bool = False
 
 
 class ApprovalDecision(BaseModel):
     """The human's answer. approved_by is the approver's own name, typed by them."""
 
-    approved: bool
+    approved: bool = False
     approved_by: str | None = None
+    co_approver: str | None = None  # second, different person when the amount needs two signatures
     reason: str = ""
-    queued_approval_id: str | None = None  # dashboard runs: prepared, waiting for a human click
+    queued: bool = False        # dashboard runs: left in the signature tray for a person
 
 
 Approver = Callable[[ApprovalRequest], Awaitable[ApprovalDecision]]
 
 
 class AuditEvent(BaseModel):
-    """One line in output/audit_trail.json (one agent-loop step or one control event)."""
+    """One line in output/audit_trail.json (one agent-loop step or one control event).
+
+    `prev_hash` / `hash` chain every event to the one before it (sha256), so any later
+    edit to the trail is detectable with backend/verify_audit.py.
+    """
 
     ts: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
     team_run_id: str
@@ -48,18 +60,22 @@ class AuditEvent(BaseModel):
     depth: int | None = None
     chain: list[Role] = Field(default_factory=list)
     step: int | None = None
-    event: str                    # team_start, agent_start, model_request, model_response,
-                                  # delegation, delegation_refused, approval, agent_end, team_end, error
+    event: str                    # team_start, agent_start, model_request, model_response, delegation,
+                                  # delegation_refused, approval_*, payment_*, agent_end, team_end, error
     detail: dict[str, Any] = Field(default_factory=dict)
     usage: dict[str, int] | None = None
+    prev_hash: str | None = None
+    hash: str | None = None
 
 
 @dataclass
 class TeamState:
-    """Shared by every agent in one team run (counters, budget, approver)."""
+    """Shared by every agent in one team run (counters, budget, approver, the ticket's context)."""
 
     team_run_id: str
     approver: Approver
+    ticket_id: int | None = None
+    context_packet: str = ""      # compact JSON from get_ticket_context, verified at run start
     usage: RunUsage = field(default_factory=RunUsage)
     delegations: int = 0
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -74,29 +90,15 @@ class TeamDeps:
     chain: list[Role]
     agent_run_id: str
     team: TeamState
-
-
-class PendingApproval(BaseModel):
-    """A payment an agent prepared during a dashboard run. Only POST /api/approvals/{id}/approve pays it."""
-
-    id: str
-    created_ts: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
-    team_run_id: str
-    ticket_id: int | None = None
-    agent: Role
-    tool: str                      # pay_invoice or pay_rent
-    args: dict[str, Any]           # invoice_id/lease_id + account (never approved_by)
-    status: Literal["pending", "approved", "declined", "failed"] = "pending"
-    approved_by: str | None = None
-    decided_ts: str | None = None
-    reason: str | None = None
-    result: dict[str, Any] | None = None
+    delegations_used: int = 0                              # this agent run's own hand-offs
+    seen_tool_calls: set[str] = field(default_factory=set)  # de-duplicates replayed calls in the audit
 
 
 class TeamRunResult(BaseModel):
     """What one full team run returns to the caller."""
 
     team_run_id: str
+    ticket_id: int | None = None
     report: str
     delegations: int
     requests: int

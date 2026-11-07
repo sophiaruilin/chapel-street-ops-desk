@@ -21,7 +21,7 @@ export default function Ledger({ cash, opening, paid }: { cash: Cash | null; ope
   const pct = opening ? Math.max(0, Math.min(100, (balance / opening) * 100)) : 100
   return (
     <section className="ledger" aria-label="Checking balance">
-      <div className="ledger-kicker">Checking account</div>
+      <div className="ledger-kicker">Checking account <span className="practice">practice ledger · no real money</span></div>
       <div className="ledger-balance" aria-live="polite">
         {cash ? money(shown) : '—'}
         {drop && <span key={drop.key} className="paid-stamp">−{money(drop.amount)} · PAID</span>}
@@ -36,7 +36,7 @@ export default function Ledger({ cash, opening, paid }: { cash: Cash | null; ope
         <ul className="ledger-lines">
           {paid.map((p) => (
             <li key={p.id}>
-              <span>{p.tool === 'pay_rent' ? `Rent · lease ${p.args.lease_id}` : `Invoice ${p.args.invoice_id}`}</span>
+              <span>{p.tool === 'pay_rent' ? `Rent · lease ${p.args.lease_id}` : p.tool === 'order_stock' ? `Order · ${p.args.qty} × ${p.args.sku}` : `Invoice ${p.args.invoice_id}`}</span>
               <span className="neg">−{money(Number(p.result?.amount ?? 0))}</span>
               <small>signed by {p.approved_by}</small>
             </li>

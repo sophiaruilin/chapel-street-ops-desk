@@ -4,7 +4,7 @@ Database: `data/campus_customs_new.db` (working copy of the original `data/campu
 
 **What's in this harness:** shop rules (R1–R8) → database tables (P2) → MCP tools (P3 + full list) → the five agents (P5) → safety guardrails and token limits → API routes (P7) → dashboard (P8) → the full run and how to reproduce it (P9).
 
-**How to run everything** (three terminals):
+**How to run everything:**
 Setup and the full step-by-step are in `README.md`. In short, with `hw5/.venv` activated:
 1. Backend: `cd backend` then `uvicorn main:app --reload --port 8000`. It starts the MCP server (`mcp_server/server.py`) itself over stdio.
 2. Dashboard: `cd frontend` then `npm run dev`, and open http://localhost:5173.
@@ -19,11 +19,11 @@ Every agent and every MCP tool follows these rules. The right-hand column says w
 | R1 | `desk.date_today` is "today" for the shop. Use it to decide what is overdue. | MCP tools read today from `desk` (`_date_today()`), never from the computer clock. `get_lease_rent_and_cash` returns `days_until_due` and `overdue` against that date. |
 | R2 | Vendor lead times come from the `vendors` table. | Agents quote `vendors.lead_days` only and never estimate delivery times themselves. |
 | R3 | A vendor will not ship new product while it still has an open unpaid invoice. | No restock or reprint is promised until that vendor's invoices are paid. Example: Bulldog Print Co has open invoice 501 ($840, due 2026-08-28, overdue as of 2026-08-31), so the size-S tee for ticket 101 cannot be reprinted until 501 is paid. |
-| R4 | Human approval is required for any payment, and a payment must update the relevant tables. | `pay_invoice` and `pay_rent` pause the agent run for a human in the terminal. Only the human's typed name fills `payments.approved_by`, and the server refuses a blank or agent-role approver. In one transaction each inserts the `payments` row, lowers `cash_accounts.balance`, and marks the invoice `paid` or advances `leases.next_due` one month. |
-| R5 | If there is not enough cash, the pay tool must refuse. No negative balances. | Both pay tools check `balance >= amount` inside the transaction and refuse otherwise, with nothing written (tested with $500 in checking). |
+| R4 | Human approval is required for any payment, and a payment must update the relevant tables. | Agents only *prepare*: `create_approval` stores each payment in `approvals` with the payee and amount frozen. A person executes it, either on the dashboard (desk PIN + name) or in the terminal. The pay tool runs at most once, refuses if the record changed, and in one transaction writes `payments`, lowers `cash_accounts.balance`, marks the invoice `paid` or advances `leases.next_due`, and marks the approval approved. |
+| R5 | If there is not enough cash, the pay tool must refuse. No negative balances. | Cash is checked when an approval is prepared *and* again inside the execute transaction. Either refusal writes nothing (covered by tests). |
 | R6 | Cash only goes out. No revenue is modeled, so no money comes in. | Nothing ever raises a cash balance. Selling hoodies in ticket 103 does not add cash, so ticket planning has to fit the $3,400 in checking. |
-| R7 | Before a full run to resolve the tickets, reset the database to its original values. | Run `python backend/reset_db.py`. It copies `data/campus_customs.db` over `data/campus_customs_new.db`. |
-| R8 | Do not email customers or call real vendors. Drafts stay on the board. | Agents only write drafts. No tool sends email or contacts anyone outside the shop. |
+| R7 | Before a full run to resolve the tickets, reset the database to its original values. | `python backend/reset_db.py`, `POST /api/reset` (PIN) or "Reset the shop" copies `data/campus_customs.db` over `data/campus_customs_new.db` (approvals and drafts start empty). `run_tickets.py` resets automatically. |
+| R8 | Do not email customers or call real vendors. Drafts stay on the board. | Agents only write drafts (`drafts` table: customer vs internal, `sent = 0`). No tool sends email or contacts anyone outside the shop. |
 
 ## Problem 2 — Database tables
 
@@ -82,121 +82,132 @@ Why it matters: it is the record of money going out. It is empty today, and its 
 
 ## Problem 5 — Agent team
 
-All five agents are PydanticAI agents in `backend/agents/team.py`. Prompts are in `backend/prompts/` (one file per agent, plus `shop_rules.md`, which is inserted into all of them). Data types are in `backend/models.py`. Every agent uses the same model: **gpt-6-astra via Portkey, Responses API, reasoning effort medium** (see `backend/config.py`). Run with `backend/run_tickets.py`.
+All five agents are PydanticAI agents in `backend/agents/team.py`. Prompts are in `backend/prompts/` (one file per agent, plus `shop_rules.md`, which is inserted into all of them). Data types are in `backend/models.py`. Every agent uses the same model: **gpt-6-astra via Portkey, Responses API, reasoning effort medium** (`backend/config.py`). Run from the dashboard, or from `backend/run_tickets.py`, which runs each open ticket as its own team run.
 
-| Agent | Job | MCP tools it can call | Can delegate to |
+| Agent | Job | MCP tools it can call | Usually called for |
 |---|---|---|---|
-| **Boss** (`prompts/boss.md`) | Reads the board, delegates, checks total cash across tickets before any payment, sets ticket status, writes the final report | `get_desk_date`, `list_open_tickets`, `get_ticket`, `update_ticket_status` | everyone |
-| **Inventory** (`prompts/inventory.md`) | Stock and aisle by SKU/size, vendor and lead time, the open-invoice shipping hold | `get_desk_date`, `check_stock_by_sku_and_size`, `list_vendors`, `list_open_invoices` | everyone |
-| **Accounting** (`prompts/accounting.md`) | Cash math, open invoices, cost/price/margin, payments (human-approved) | `get_desk_date`, `get_cash_balances`, `list_open_invoices`, `get_sku_cost_and_price`, `list_payments`, `pay_invoice`, `pay_rent` | everyone |
-| **Facilities** (`prompts/facilities.md`) | Checks landlord notices against the lease on file | `get_desk_date`, `get_lease_rent_and_cash`, `get_ticket`, `list_payments` | everyone |
-| **Customer Service** (`prompts/customer_service.md`) | Writes draft replies on the board (never sent) | `get_desk_date`, `list_open_tickets`, `get_ticket`, `check_stock_by_sku_and_size`, `add_ticket_draft` | everyone |
+| **Boss** (`prompts/boss.md`) | Reads the verified context packet, delegates decisions (not lookups), sets ticket status, writes the final report | `get_desk_date`, `list_open_tickets`, `get_ticket`, `update_ticket_status` | every ticket |
+| **Inventory** (`prompts/inventory.md`) | Stock and aisle by SKU/size, vendor lead times, the open-invoice shipping hold | `get_desk_date`, `check_stock_by_sku_and_size`, `list_vendors`, `list_open_invoices` | stock questions the packet can't answer |
+| **Accounting** (`prompts/accounting.md`) | Cash math across pending approvals; **prepares** payments, purchases and bulk prices | `get_desk_date`, `get_cash_balances`, `list_open_invoices`, `get_sku_cost_and_price`, `list_payments`, `pay_invoice`, `pay_rent`, `order_stock`, `set_bulk_price` | 101, 102, 103 |
+| **Facilities** (`prompts/facilities.md`) | Checks landlord notices against the lease | `get_desk_date`, `get_lease_rent_and_cash`, `get_ticket`, `list_payments` | lease questions the packet can't answer |
+| **Customer Service** (`prompts/customer_service.md`) | Customer-facing and internal drafts (never sent) | `get_desk_date`, `get_ticket`, `check_stock_by_sku_and_size`, `add_ticket_draft` | replies on 101, 102, 103 |
 
-**Full connectivity:** every agent has `ask_teammate(teammate, request)`, which runs the teammate as its own agent loop and returns its report. Refused: asking yourself, asking back the agent that just asked you, going deeper than 2 levels, or going over 12 delegations in a run.
+**How a run works (`run_team` → `run_role`):**
+1. **The desk fetches the ticket's context in code**, using one MCP call (`get_ticket_context`): the ticket and its drafts, desk date, cash, stock (requested size and all sizes), pricing, vendors, open invoices, the lease and rent payments, and *every pending approval* on the board. It becomes the Boss's task as a verified packet.
+2. **Code-level routing** suggests specialists per ticket type (`agents/roles.py` → `ROUTES`): customer_order → Inventory, Accounting, CS · rent_notice → Facilities, Accounting · price_override → Accounting, Inventory, CS. The Boss skips anyone whose facts are already in the packet.
+3. **Full connectivity, hub-and-spoke by default.** Every agent has `ask_teammate(teammate, request, known_facts)`, and the desk attaches the packet plus `known_facts` to every hand-off, so nobody re-fetches. Refused: asking yourself, bouncing back to your caller, going deeper than 2 levels, a specialist's 2nd delegation, or more than 6 per ticket.
+4. **The agent loop** steps through `agent.iter()` and appends every step to the audit trail. When an approval tool is called, the run pauses (`DeferredToolRequests`), the desk prepares the approval through MCP (`create_approval`, amount frozen), and then either leaves it in the dashboard tray ("prepared, not done") or asks the terminal user. The same run then resumes with the outcome.
 
-**Agent loop** (`run_role`): it steps through `agent.iter()`, and every step is appended to `output/audit_trail.json`. When a pay tool is called, the run pauses (`DeferredToolRequests`), a human approves or declines in the terminal, and the same run resumes with that decision.
+**Audit trail** (`output/audit_trail.json`, append-only, never wiped, **hash-chained**): every event has `team_run_id`, `agent_run_id`, agent, depth, delegation chain, step, event type, details and running token usage, plus `prev_hash`/`hash`. Event types: `team_start` (with the ticket and a label: dashboard / cli / test), `agent_start`, `model_request` (tool results), `model_response` (tool calls with arguments, text, tokens), `delegation` (request + known_facts), `delegation_refused`, `paused_for_approval`, `approval_prepared` / `approval_queued` / `approval_refused` / `approval_granted` / `approval_declined`, `agent_end`, `team_end`, and the human's `approval_signed`, `payment_declined`, `ticket_status` and `db_reset`. A tool call replayed when a paused run resumes is logged once. `python backend/verify_audit.py` recomputes the chain: events before the chain existed (the first-version runs) are counted, and every later event is verified.
 
-**Audit trail** (`output/audit_trail.json`, append-only, never wiped): each event records the team run id, agent run id, agent, depth, delegation chain, step number, and the event type (`team_start`, `agent_start`, `model_request` with tool results, `model_response` with tool calls and arguments, text and token counts, `delegation`, `delegation_refused`, `paused_for_approval`, `approval` with the approver's name or the reason for declining, `agent_end`, `team_end`, `error`). It also records the team's running token and request usage.
+## MCP tools (all on `campus-customs-ops`, `mcp_server/server.py`), 21 in total
 
-## MCP tools (all on `campus-customs-ops`, `mcp_server/server.py`)
-
-| Tool | Table(s) used | Reads or writes | Added in |
+| Tool | Table(s) used | Reads / writes | Who uses it |
 |---|---|---|---|
-| `check_stock_by_sku_and_size` | inventory | read | P3 |
-| `get_lease_rent_and_cash` | leases, cash_accounts, desk | read | P3 |
-| `get_sku_cost_and_price` | pricing (+ inventory for the name) | read | P3 |
-| `get_desk_date` | desk | read | P5 |
-| `list_open_tickets` | tickets | read | P5 |
-| `list_tickets` | tickets (all, including resolved) | read; used by the API's ticket list | P7 |
-| `get_ticket` | tickets | read | P5 |
-| `list_vendors` | vendors | read | P5 |
-| `list_open_invoices` | invoices, vendors, desk | read | P5 |
-| `get_cash_balances` | cash_accounts, desk | read | P5 |
-| `list_payments` | payments | read | P5 |
-| `pay_invoice` | invoices, cash_accounts, payments, desk | **write, human approval** | P5 |
-| `pay_rent` | leases, cash_accounts, payments, desk | **write, human approval** | P5 |
-| `add_ticket_draft` | tickets (notes), desk | write (draft only, nothing sent) | P5 |
-| `update_ticket_status` | tickets (status) | write | P5 |
+| `check_stock_by_sku_and_size` | inventory | read | Inventory, CS |
+| `get_lease_rent_and_cash` | leases, cash_accounts, desk | read | Facilities |
+| `get_sku_cost_and_price` | pricing (+ inventory name) | read | Accounting |
+| `get_desk_date` | desk | read | all |
+| `list_open_tickets` / `list_tickets` | tickets | read | Boss / API |
+| `get_ticket` | tickets, drafts | read (notes flagged as untrusted) | Boss, Facilities, CS, API |
+| `get_ticket_context` | tickets, drafts, desk, cash_accounts, inventory, pricing, vendors, invoices, leases, payments, approvals | read: one verified packet per ticket | desk code (before the Boss) |
+| `list_vendors` | vendors | read | Inventory |
+| `list_open_invoices` | invoices, vendors, desk | read | Inventory, Accounting |
+| `get_cash_balances` | cash_accounts, desk | read | Accounting, API |
+| `list_payments` | payments | read | Accounting, Facilities, API |
+| `create_approval` | approvals (+ invoices, leases, vendors, pricing, cash_accounts to quote) | **write**: prepares; freezes payee and amount; refuses up front if cash is short, the vendor is on hold, or the price is below cost | desk code |
+| `list_approvals` | approvals | read | API, desk code |
+| `decline_approval` | approvals | **write**: a human declines | API, terminal |
+| `pay_invoice` | approvals, invoices, cash_accounts, payments | **write, human-approved, at most once** | Accounting (prepares) → API / terminal (executes) |
+| `pay_rent` | approvals, leases, cash_accounts, payments | **write, human-approved, at most once** | same |
+| `order_stock` | approvals, purchase_orders, vendors, pricing, cash_accounts, payments | **write, human-approved**; refused while the vendor has an unpaid invoice | same |
+| `set_bulk_price` | approvals, pricing | **write, human-approved**; between cost and list price; no cash | same |
+| `add_ticket_draft` | drafts | write: customer **or** internal, never sent | CS |
+| `update_ticket_status` | tickets | write | Boss, API |
 
-There is no second shop-tools layer. The agents reach the database only through this MCP server, which runs as a stdio subprocess the same way Claude Code launches it.
-
-## Safety
-
-**Guardrails a real business would want when agents touch real customers and real money:**
-- **A human approves every payment.** Pay tools are gated in the agent code, the model never sees `approved_by`, and the server refuses a blank or agent-role approver. A real business would add per-amount limits (for example two approvers above $1,000) and sign-in tied to real identities, not a typed name.
-- **The amount comes from the record, never from the message.** Rent is paid at `leases.monthly_rent` and invoices at `invoices.amount`. Email amounts are claims to verify, which also protects against invoice-fraud and phishing emails.
-- **No negative balances and no double payments.** The server checks cash before writing, refuses an invoice that isn't open, and refuses rent already paid ahead. Each payment is one transaction across `payments`, `cash_accounts` and the invoice or lease.
-- **Least privilege.** Each agent sees only the tools its role needs. Only Accounting can pay, only Customer Service writes customer drafts, and only the Boss closes tickets.
-- **Nothing leaves the building.** Customer and vendor messages are drafts on the board. A human reviews and sends them.
-- **Facts only from tools.** The prompts forbid invented numbers, and the audit trail lets a person check every claim against the tool result behind it.
-- **Full, append-only audit trail** of every model call, tool call, delegation and approval, plus a database reset before each full run so test runs never build on each other.
-- **Next steps for real use:** run the agents read-only by default, use a separate least-privilege database user, add alerts on refused or declined payments, and keep personal customer data out of prompts unless it's needed.
-
-**Limits that keep token use in check** (`backend/config.py`):
-- Delegation depth of 2 at most, 12 delegations per team run, no self-delegation and no bounce-back to the caller (stops A→B→A loops).
-- One shared team budget: 60 model requests and 400,000 tokens across all agents. When it runs out, agents stop cleanly and report what they have.
-- At most 3 approval pauses per agent run, 2 retries per tool error, long text trimmed to 1,500 characters in the audit trail.
-- Focused requests: the Boss is told to send short, self-contained requests and to delegate only to the specialist who holds the facts, with about 12 delegations per run.
-- Example: a live run on ticket 102 alone used 8 delegations, 28 requests and about 74k tokens.
+The first time the server touches the working copy, it adds three tables: **`approvals`** (id, ticket, agent, tool, args, kind, frozen payee/amount/memo/due, status, approvers, result), **`drafts`** (ticket, audience customer/internal, text, sent = 0) and **`purchase_orders`**. The original `data/campus_customs.db` is never written to. There's no second shop-tools layer: the agents, the API and Claude Code all reach the data only through this server.
 
 ## Problem 7 — Backend routes (`backend/main.py`, FastAPI)
 
-Start from `backend/`: `uvicorn main:app --reload --port 8000`. Base URL: `http://localhost:8000`, API docs at `/docs`. Every route gets shop data through the `campus-customs-ops` MCP server.
+Start from `backend/` with `hw5/.venv` activated: `uvicorn main:app --reload --port 8000`. API docs are at `/docs`, and `/` redirects to the board. CORS allows only the Vite origin `http://localhost:5173`.
 
-- `GET /api/tickets`: the 3 tickets, each with `state` open or resolved (plus the detailed status and pending-approval count).
-- `GET /api/tickets/{id}`: one ticket in full, including the draft replies saved in its notes.
-- `POST /api/tickets/{id}/run`: starts the agent team on that one ticket in the background and returns a `team_run_id` (409 if a run is already going).
-- `POST /api/tickets/{id}/status` with body `{"status": "resolved", "by": "Name"}`: a human moves a ticket on the board, for example "Mark resolved" on the dashboard (added in Problem 8).
-- `GET /api/runs/{team_run_id}` and `GET /api/runs/latest` (null before the first run): the run's status (running, finished or failed), the Boss's final report, and its delegation, request and token counts.
-- `GET /api/events?limit=50&since=N&team_run_id=X`: recent agent events from `audit_trail.json`, showing what each agent said, which tools it called with which arguments, and the tool results. `since` lets the board fetch only new events.
-- `GET /api/approvals?status=pending`: payments the agents prepared and that are waiting for a human, each with a `preview` (payee, amount, memo, due date) looked up through MCP so the human sees what they are signing.
-- `POST /api/approvals/{id}/approve` with body `{"approved_by": "Full Name"}`: a human approves, and **this is the only route that pays**. It calls `pay_invoice`/`pay_rent` on the MCP server, which changes `cash_accounts`, `payments` and the invoice or lease, or refuses if cash is short.
-- `POST /api/approvals/{id}/decline` with body `{"reason": "..."}`: a human declines, and nothing is paid.
-- `GET /api/cash`: the current checking balance from `cash_accounts`.
-- `POST /api/reset`: resets `campus_customs_new.db` to the original values and clears queued payments, for a fresh run (409 while a run is going).
-- `GET /api/health`: liveness check and model name.
-
-**How a dashboard payment works:** during a run, an agent's `pay_invoice`/`pay_rent` call pauses. The backend records it in `output/pending_approvals.json` and tells the agent "prepared, not paid", so the agents never move cash themselves. When a human clicks Approve, the approve route makes the payment with that person's name as `approved_by`. Approvals, declines and refusals are appended to `audit_trail.json` as well.
+- `GET /api/tickets`: the 3 tickets with `state` (open or resolved), the detailed status and the pending-approval count.
+- `GET /api/tickets/{id}`: one ticket with its customer and internal drafts.
+- `POST /api/tickets/{id}/run`: starts the agent team on that ticket in the background and returns a `team_run_id` (409 if a run is already going).
+- `GET /api/tickets/{id}/last_run`: that ticket's last run, rebuilt from the audit trail (survives restarts and fresh clones).
+- `GET /api/runs/{team_run_id}` · `GET /api/runs/latest`: run status, the Boss's report, and hand-off, request and token counts.
+- `GET /api/events?limit=&since=&team_run_id=`: recent agent events (what each agent said, tool calls and results) for the board to refresh.
+- `GET /api/approvals?status=`: everything the agents prepared (payments, purchases, prices), with the frozen payee and amount.
+- `POST /api/approvals/{id}/approve` with `{"approved_by", "pin"}`: **the only route that executes an approval** (pays, orders or approves a price), through the MCP tool, at most once. It needs the desk PIN and a human name. The ticket auto-resolves when every approval it was waiting on is signed.
+- `POST /api/approvals/{id}/decline` with `{"declined_by", "pin", "reason"}`: a human declines, nothing happens, and the ticket is marked blocked.
+- `GET /api/cash`: checking balance from `cash_accounts`, plus the opening balance (balance + paid out) and a `practice_ledger` flag.
+- `POST /api/tickets/{id}/status` with `{"status", "by"}`: a person moves a ticket (for example "Mark resolved").
+- `POST /api/reset` with `{"pin"}`: resets the working DB to the original (approvals and drafts start empty). PIN required; 409 while a run is going.
+- `GET /api/health`: liveness check, model, and whether approvals are unlocked.
 
 ## Problem 8 — Dashboard (`frontend/`, React + Vite + TypeScript)
 
-Start it with `npm run dev` from `frontend/` (http://localhost:5173). It calls only the Problem 7 routes at http://localhost:8000 (`src/api.ts`), and the backend's CORS allows only the Vite origin. The full design rationale is in `output/design.md`.
+`npm run dev` in `frontend/` opens http://localhost:5173. It calls only the routes above. Design rationale: `output/design.md`.
 
-- **The Board (left):** the 3 tickets as claim stubs with a rubber status stamp (Open, Awaiting signature, Blocked, Resolved) and a "Send to the team →" button (`POST /api/tickets/{id}/run`).
-- **Team table (centre):** the Boss and four specialists. Each seat shows thinking, "waiting on X" or done, the agent's latest words and its tools, live from `GET /api/events` every 1.5 s.
-- **The wire / Who did what (centre tabs):** a live feed where each agent writes in its own voice (memo, stockroom tag, ledger, notice, handwritten note), then per-agent receipts and the Boss's memo when the run finishes.
-- **Signature tray (right):** each prepared payment as a cheque (payee, amount, memo, due date). **Sign & pay** calls `POST /api/approvals/{id}/approve`, the only path that moves cash; Decline is also offered.
-- **Brass ledger (header):** checking from `GET /api/cash`. It counts down with a red "PAID" stamp after an approved payment. Next to it are the desk-date calendar and "Reset the shop" (`POST /api/reset`).
-- **Resolved tickets:** the stamp shows the database status. After a run, "Mark resolved ✓" (`POST /api/tickets/{id}/status`) appears once no cheque is pending for that ticket.
-- **Handsome Dan's corner:** rotating one-line desk tips, plus cheers on runs and payments.
+- **The Board (left):** claim stubs with a rubber status stamp and "Send to the team →".
+- **Team table (centre):** the Boss and four specialists; seats light up, show "waiting on X", their latest words and tools, and "not called" when skipped.
+- **The wire / Who did what:** a live feed in each agent's voice; per-agent receipts, the Boss's memo, and the **drafts** (customer on a lined card, internal on grey "team only" paper).
+- **Signature tray (right):** a "Signing as" name plus **Desk PIN**. Payments and purchases show as blue cheques and prices as green cards; it shows two-signature progress above the limit, and the server's refusals in red ("The pay tool refused it (practice ledger)").
+- **Brass ledger (header):** checking, labelled *practice ledger · no real money*; rolls down with a red PAID stamp; lists signed lines with the signer.
+- **Resolved:** a green stamp thumps in when the desk auto-resolves a ticket after its approvals, or when a person clicks "Mark resolved ✓".
+- **Links:** `?ticket=103&tab=summary` opens a ticket straight to its summary; past runs reload from the audit trail.
+- **Handsome Dan's corner:** rotating desk tips and cheers.
 
-## Problem 9 — Full run on the three tickets
+## Problem 9 — Full run on the three tickets (final)
 
-**Reset first:** `POST /api/reset`, confirmed byte-identical to the original database. Starting checking **$3,400.00**, no payments, all tickets open. Then 101 → 102 → 103 were run one at a time from the React board. On the user's instruction (*"don't send any money but just let it sit"*), the two cheques the agents prepared were **left unsigned**: not approved and not declined.
+**Reset first:** `POST /api/reset` (PIN). Start: checking **$3,400.00**, no payments, all tickets open. Then 101 → 102 → 103 were run one at a time from the board. Sophia Lin signed every approval on the dashboard with the desk PIN.
 
-| Ticket | Final status | Agents used | Hand-offs (refused) | Requests / tokens | Money |
-|---|---|---|---|---|---|
-| 101 Bulldog tee | `waiting_approval` | Boss, Inventory, Accounting, Customer Service | 7 (5) | 27 / 74,440 | $840 `pay_invoice(501)` prepared, approval `5ef259bd` pending |
-| 102 Rent due | `waiting_approval` | Boss, Facilities, Accounting, Customer Service | 9 (3) | 31 / 88,170 | $2,400 `pay_rent(1)` prepared, approval `60ca7e64` pending |
-| 103 Bulk hoodies | `blocked` | all five | 9 (9) | 37 / 109,996 | none |
+| Ticket | Final status | Agents used | Hand-offs | Requests / tokens | Approval (signed by Sophia Lin) | Cash |
+|---|---|---|---|---|---|---|
+| 101 Bulldog tee | **resolved** (auto, when the cheque cleared) | Boss, Accounting, Customer Service | 2 | 8 / 29,388 | `0ada2b7a` pay_invoice 501 · Bulldog Print Co | −$840.00 |
+| 102 Rent due | **resolved** (auto) | Boss, Accounting, Customer Service | 2 | 8 / 26,774 | `1d09d1aa` pay_rent lease 1 · Elm City Properties | −$2,400.00 |
+| 103 Bulk hoodies | **resolved** (Sophia, after the Boss set blocked) | Boss, Accounting, Customer Service | 2 | 9 / 33,926 | `6c53dde3` set_bulk_price 20 × M at $51.00 (no cash) | $0.00 |
 
-**Cash check** (read straight from SQLite): start $3,400.00 − payments $0.00 = **$3,400.00** = `cash_accounts.checking` ✓. The `payments` table is empty, invoice 501 is still open, and lease 1 is still due 2026-09-02. If both cheques are signed later: $3,400 − $840 − $2,400 = **$160.00**.
+**Cash check** (read straight from SQLite): $3,400.00 − ($840.00 + $2,400.00) = **$160.00** = `cash_accounts.checking` ✓. There are two `payments` rows, both `approved_by = Sophia Lin`; invoice 501 is `paid`; lease 1 is next due 2026-10-02; `purchase_orders` is empty (a 12-hoodie reprint at $264 would exceed the $160 left).
 
-**Where the results are:** `output/desk_tickets.html` (Expected vs Actual per ticket, the Cash tab and the Reflection tab), `output/resolved_tickets.json` (per ticket: status, outcome, each agent's contribution and tools, approvals), `output/resolved_board.html` (board screenshots per ticket) and `output/audit_trail.json` (every step, appended; the three real runs are `a02b5d3e49`, `ada701f573` and `c7e2bbaa10`).
+**Efficiency vs the first version (2026-11-06, same tickets):** hand-offs 25 → **6**, model requests 95 → **25**, tokens 272,606 → **90,088** (−67%). Both runs are in the audit trail.
 
-**Audit note:** when a paused run resumes after an approval decision, PydanticAI replays the paused tool call, so the trail logs that call twice with the same `tool_call_id`. Count tool calls by unique `tool_call_id`; there was exactly one prepared payment per ticket.
+**Where the results are:** `output/desk_tickets.html` (Expected vs Actual per ticket, Cash, Reflection), `output/resolved_tickets.json`, `output/resolved_board.html` (board screenshots), `output/audit_trail.json` (final runs `a0e1a12474`, `3ddcf8e24f`, `0aafa81443`).
+
+## Safety
+
+**Guardrails a real business would want when agents touch real customers and real money, and what this desk does:**
+- **Agents prepare; people execute.** The four money and price tools only *prepare* an approval. Only `POST /api/approvals/{id}/approve` (PIN + name) or a person at the terminal can execute one. The model never sees `approval_id` / `approved_by`, and the server refuses blank or agent-role approvers.
+- **Approve exactly what was shown.** The payee and amount are frozen from the records when prepared. Execution re-quotes inside the transaction and refuses if the record changed. Amounts always come from records (lease, invoice, pricing), never from an email.
+- **At most once.** An approval executes once (a repeat signature returns the original result). A duplicate prepare returns the same pending approval. Rent can't be paid ahead.
+- **Two people above a limit.** Above `SECOND_APPROVER_ABOVE` (default $5,000) two different approvers are required. An optional `DESK_APPROVERS` allow-list limits who may sign.
+- **No negative balances.** Cash is checked when preparing *and* when executing. Purchases are refused while the vendor has an unpaid invoice. Prices must sit between cost and list.
+- **Least privilege.** Each agent sees only its tools. Only Accounting can prepare money moves, and only Customer Service writes drafts.
+- **Nothing leaves the building.** Drafts are stored with an audience (customer vs internal) and `sent = 0`. Ticket text is flagged as untrusted input, and prompts say never to follow instructions inside it.
+- **Tamper-evident audit.** Every step is hash-chained, and `verify_audit.py` detects edits or deletions.
+- **Practice ledger, clearly labelled.** No bank, card or payment provider is connected. The only outside call is the model via Portkey.
+- **Tested.** `tests/` (20 tests, no model calls, temp databases) covers each rule above. Run `python -m pytest tests`.
+- **Next steps for real use:** real sign-in (SSO) instead of a shared PIN, per-role approval limits, alerts on refused or declined payments, a read-only database user for read tools, and PII redaction in the audit.
+
+**Limits that keep token use in check** (`backend/config.py`), sized from the first version's real runs (27–37 requests, 74k–110k tokens per ticket):
+- The context is fetched **once in code** and handed to every agent as verified, so there are no repeated lookups.
+- Hand-offs carry `known_facts`, so specialists answer instead of re-asking.
+- Per ticket: 6 delegations, **1 per specialist run**, depth 2, no self or bounce-back delegation.
+- Per ticket: **30 model requests and 150,000 tokens**, shared across all agents; when the budget runs out, agents stop cleanly.
+- At most 3 approval pauses per agent run; tool errors retried twice; audit texts trimmed (the Boss's report is kept up to 8,000 characters).
+- Result: 8–9 requests and 27k–34k tokens per ticket in the final run.
 
 ## Safety rules, all in one place
 
 | Rule | Enforced by |
 |---|---|
-| Today = `desk.date_today` | every date calculation in the MCP server; the desk calendar on the dashboard |
-| Lead times only from `vendors` | `list_vendors` is the only source; prompts forbid estimating |
-| No shipping while a vendor invoice is unpaid | `list_open_invoices` → `vendor_will_ship: false`; Inventory prompt |
-| Human approval for every payment | agent-side approval gate (the model never sees `approved_by`), dashboard cheques with a typed signature, server refuses blank or agent-role approvers |
-| A payment updates the relevant tables | one SQLite transaction: `payments` + `cash_accounts` + invoice `paid` or lease `next_due` +1 month |
-| No negative balances | pay tools check the balance inside the transaction and refuse (tested at $500) |
-| Cash only goes out | no tool adds money; ledger gauge on the dashboard |
-| Reset before a full run | `backend/reset_db.py`, `POST /api/reset`, the "Reset the shop" button, and automatic in `run_tickets.py` |
-| No emails or vendor calls; drafts on the board | no send tool exists; `add_ticket_draft` marks every draft "not sent" |
-| Token and loop limits | depth 2, 12 delegations per run, no self or bounce-back delegation, a 60-request / 400k-token team budget, one run at a time |
+| Today = `desk.date_today` | every date calculation in the MCP server; the context packet; the desk calendar on the dashboard |
+| Lead times only from `vendors` | `list_vendors` / the packet are the only sources; `order_stock` computes expected = today + `lead_days` |
+| No shipping while a vendor invoice is unpaid | `list_open_invoices` → `vendor_will_ship: false`; `order_stock` refused at prepare and at execute |
+| Human approval for every payment | prepare/execute split, desk PIN, the server refuses agent approvers, approvals stored in the DB |
+| A payment updates the relevant tables | one SQLite transaction: approvals + payments + cash_accounts + invoice `paid` / lease `next_due` / purchase order |
+| No negative balances | cash checked at prepare and inside the execute transaction (tested) |
+| Cash only goes out | no tool adds money; a price approval moves no cash; the ledger's opening balance = balance + paid out |
+| Reset before a full run | `backend/reset_db.py`, `POST /api/reset` (PIN), "Reset the shop", automatic in `run_tickets.py` |
+| No emails or vendor calls; drafts on the board | no send tool exists; drafts carry an audience and `sent = 0` |
+| Token and loop limits | context packet, known_facts, hub-and-spoke budgets, 30-request / 150k-token cap per ticket, one run at a time |

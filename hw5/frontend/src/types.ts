@@ -47,18 +47,37 @@ export interface EventsPage {
 
 export interface Approval {
   id: string
-  created_ts: string
-  team_run_id: string
+  created_at: string
+  team_run_id: string | null
   ticket_id: number | null
-  agent: Role
-  tool: 'pay_invoice' | 'pay_rent' | string
+  agent: Role | null
+  tool: 'pay_invoice' | 'pay_rent' | 'order_stock' | 'set_bulk_price' | string
   args: Record<string, unknown>
-  status: 'pending' | 'approved' | 'declined' | 'failed'
+  kind: 'payment' | 'purchase' | 'price'
+  payee: string | null
+  amount: number
+  memo: string | null
+  due: string | null
+  status: 'pending' | 'partially_approved' | 'approved' | 'declined' | 'failed'
+  first_approver: string | null
   approved_by: string | null
-  decided_ts: string | null
+  decided_at: string | null
   reason: string | null
   result: Record<string, unknown> | null
-  preview?: { payee: string; amount: number; memo: string; due: string | null } | null
+  needs_two_approvers: boolean
+}
+
+export interface Draft {
+  id: number
+  audience: 'customer' | 'internal'
+  text: string
+  desk_date: string | null
+  sent: number
+}
+
+export interface TicketDetail extends Omit<Ticket, 'state' | 'pending_approvals'> {
+  notes: string | null
+  drafts: Draft[]
 }
 
 export interface Cash {
@@ -66,4 +85,6 @@ export interface Cash {
   balance: number
   as_of: string
   date_today: string
+  opening_balance?: number
+  paid_out?: number
 }

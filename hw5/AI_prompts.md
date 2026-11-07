@@ -225,3 +225,25 @@ Template for each problem (copy for each new problem):
 > yes please (turn on GitHub Pages)
 
 **What was lacking before:** hw5 didn't match the required layout (the MCP server was mcp_server.py, there was one venv and requirements file per folder, no top-level README, .env.example or .mcp.json, and the screenshots sat in a separate folder). So I restructured it to one root environment and server.py, embedded the screenshots in resolved_board.html, and checked that no secret was in the files before pushing to a new public repo. GitHub only showed the HTML pages as source code, so GitHub Pages now serves a landing page, the board gallery and the plan-vs-actual desk at https://sophiaruilin.github.io/chapel-street-ops-desk/.
+
+## Problem 11 follow-up — Strict review, then implementing every recommendation
+
+**Prompt (my own words):**
+
+> 2 things to review. one, if you graded like a strict TA, what would you have scored for this hw and why? and second, somewhat related, how could this hvae been even cheaper and more efifcient and safer to have done with the agents?
+
+**Follow-up prompts:**
+
+> If I sign the cheques would any cash actually go out? I'm worried about a real card payment with real card sending out money somewhere
+>
+> back to the strict TA grade areas, and how cheaper efficient and safer, please implement all recommendations
+>
+> show me where i can sign off. and why is local host saying not found
+>
+> I'mr eady to sign. what is my desk pin
+>
+> great. signed!
+>
+> Ticket 103: Mark resolved (Recommended)
+
+**What was lacking before:** The self-review scored the work about 88/100: no ticket was resolved, a cloned board was inconsistent, there was no purchase path, the agents were chatty (25 hand-offs, 273k tokens), there were no committed tests, the audit was noisy, and there were money-safety gaps (approve-time amount, identity, idempotency, draft separation, untrusted ticket text). All of it is now fixed. Approvals live in the database with frozen amounts, a desk PIN and execute-at-most-once. Purchases and bulk prices exist. The context packet and hub-and-spoke budgets cut the cost about 67%. The audit is hash-chained, and 20 tests are committed. The final run resolved all three tickets with my signatures: $3,400 − $840 − $2,400 = $160, matching cash_accounts. I also confirmed that signing only changes the practice SQLite ledger, never a real card or bank.

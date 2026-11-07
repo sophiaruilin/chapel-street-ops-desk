@@ -77,3 +77,14 @@ He also **reacts**: he jumps and cheers when you send a ticket ("Off it goes!"),
 - Run cost is visible on the Boss's memo ("8 hand-offs · 30 model calls · 79,636 tokens"), which keeps the token budget honest.
 - `prefers-reduced-motion` turns off every animation. Ticket stubs are keyboard-focusable buttons, live areas use `aria-live`, and colours meet contrast on cream.
 - If the backend isn't running, a red banner says exactly which command starts it.
+
+## Version 2: what changed after the strict review (and why it still feels like the same desk)
+
+- **The signer card.** The top of the Signature tray now holds **"Signing as"** (your name in handwriting) and a masked **Desk PIN**. Signing should feel personal *and* be protected: the PIN is checked by the backend against `.env` and kept only for this browser tab.
+- **Three kinds of approval, three looks.** Payments are the familiar **blue safety-paper cheque** ("Pay to the order of…", **Sign & pay**). Purchase orders use the same cheque with **Sign & order**. Bulk prices are a **green card** ("Approve a bulk price for…", **Approve price**), because no money moves. The amount on every card was **frozen by the server** when the agent prepared it, and that's exactly what gets paid. When a cheque is over the two-signature limit, the card shows "✒✒ signed by X, needs a second, different person."
+- **Honest refusals, in plain words.** If the server refuses (not enough cash, the record changed, the vendor is on hold), the card shows it in red: "The pay tool refused it (practice ledger): …". Nothing implies a real bank.
+- **"Practice ledger · no real money"** sits right on the brass ledger, and the opening balance comes from the records (balance + everything paid out), so a fresh browser shows "opened at $3,400.00".
+- **Drafts you can read before anything is sent.** *Who did what* ends with **Drafts on the board, never sent**: the customer reply on a lined blue card in handwriting, and internal notes on grey paper marked **"Internal note: team only"**. Same idea as the agents' voices: you can tell who a piece of writing is for at a glance.
+- **Quieter seats, on purpose.** With the context packet, Inventory and Facilities often stay "not called". That's the efficiency win showing on the table, not a missing feature.
+- **Tickets resolve themselves when they should.** When the last cheque a ticket was waiting on clears, its stamp thumps to **Resolved** without a click. For judgment calls (like 103), **Mark resolved ✓** stays a human decision.
+- **Shareable views.** `?ticket=103&tab=summary` opens straight to a ticket's summary, and past runs reload from the audit trail. That's how the gallery screenshots were taken, and how a grader who clones the repo sees the final run. Opening http://localhost:8000 now redirects to the board instead of "Not Found".

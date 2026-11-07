@@ -7,3 +7,4 @@ pydantic-ai-slim[openai,mcp]>=1.0 # the five agents + MCP client
 python-dotenv>=1.0                # reads PORTKEY_API_KEY from .env
 fastapi>=0.115                    # backend/main.py
 uvicorn[standard]>=0.30           # serves the backend
+pytest>=8.0                       # tests/ (python -m pytest)
